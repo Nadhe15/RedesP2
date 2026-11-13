@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package subastas.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Defino los estados de la subasta
+enum Estado {
+  ESTADO_DESCONOCIDO = 0;
+  ABIERTA = 1;
+  CERRADA = 2;
+}
+
+// Estructuro los datos principales de la subasta
+message Subasta {
+  string id = 1;
+  string vendedor_id = 2;
+  string titulo = 3;
+  int64 precio_salida = 4;
+  int64 incremento_minimo = 5;
+  int64 precio_actual = 6;
+  string lider_id = 7;
+  google.protobuf.Timestamp cierre = 8;
+  Estado estado = 9;
+}
+
+// Recibo los datos para enviar una puja
+message PujarReq {
+  string subasta_id = 1;
+  string usuario_id = 2;
+  int64 monto = 3;
+}
+
+// Devuelvo el resultado de la puja
+message PujarResp {
+  bool aceptada = 1;
+  string motivo = 2;
+  Subasta subasta = 3;
+}
+
+// Identifico la subasta a consultar o seguir
+message SubastaId {
+  string id = 1;
+}
+
+// Declaro las funciones del servicio
+service Subastas {
+  rpc Crear (Subasta) returns (Subasta);
+  rpc Pujar (PujarReq) returns (PujarResp);
+  rpc Obtener (SubastaId) returns (Subasta);
+  rpc Seguir (SubastaId) returns (stream Subasta);
+}
