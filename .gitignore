@@ -1,0 +1,7 @@
+# Ignoro carpetas de compilacion
+build/
+bin/
+*.o
+*.a
+*.so
+.vscode/
