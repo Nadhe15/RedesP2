@@ -1,6 +1,6 @@
-FROM debian:bookworm-slim AS builder
+FROM debian:trixie-slim AS builder
 
-# instalo compilador y librerias header-only para REST, JSON y OpenSSL
+# instalo compilador y librerias para REST, JSON y OpenSSL
 RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     make \
@@ -15,12 +15,13 @@ COPY src/ ./src/
 
 RUN make
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
-# ca-certificates y libssl3 para ejecutar el binario compilado
+# ca-certificates y librerias de ejecucion para el binario compilado
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    libssl3 \
+    libcpp-httplib0.18 \
+    libssl3t64 \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 

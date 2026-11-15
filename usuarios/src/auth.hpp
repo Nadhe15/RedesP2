@@ -45,6 +45,13 @@ public:
 
     bool obtener_usuario(const std::string& usuario_id, Usuario& out_usuario);
 
+    bool actualizar_usuario(const std::string& usuario_id,
+                            const std::string& nuevo_nombre,
+                            const std::string& nuevo_rol,
+                            bool modo_vulnerable,
+                            Usuario& out_usuario,
+                            std::string& out_error);
+
 private:
     std::mutex mtx_;
     int siguiente_id_ = 1;

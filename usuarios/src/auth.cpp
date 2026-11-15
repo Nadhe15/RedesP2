@@ -162,3 +162,29 @@ bool AuthStore::obtener_usuario(const std::string& usuario_id, Usuario& out_usua
     out_usuario = it->second;
     return true;
 }
+
+bool AuthStore::actualizar_usuario(const std::string& usuario_id,
+                                   const std::string& nuevo_nombre,
+                                   const std::string& nuevo_rol,
+                                   bool modo_vulnerable,
+                                   Usuario& out_usuario,
+                                   std::string& out_error) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = usuarios_por_id_.find(usuario_id);
+    if (it == usuarios_por_id_.end()) {
+        out_error = "usuario no encontrado";
+        return false;
+    }
+
+    if (!nuevo_nombre.empty()) {
+        it->second.nombre = nuevo_nombre;
+    }
+
+    // falla API3 (mass assignment): en modo vulnerable dejo cambiar el rol sin lista blanca
+    if (modo_vulnerable && !nuevo_rol.empty()) {
+        it->second.rol = nuevo_rol;
+    }
+
+    out_usuario = it->second;
+    return true;
+}

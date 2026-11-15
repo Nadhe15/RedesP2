@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -6,6 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "auth.hpp"
+#include "pagos.hpp"
 
 using json = nlohmann::json;
 
@@ -53,6 +55,7 @@ static void responder_error(httplib::Response& res, int status, const std::strin
 int main() {
     Config cfg = leer_config();
     AuthStore auth;
+    PagosStore pagos;
     httplib::Server svr;
 
     // endpoint basico para verificar que el contenedor levanto bien
@@ -139,6 +142,186 @@ int main() {
             {"usuario_id", ses.usuario_id},
             {"correo", ses.correo},
             {"rol", ses.rol}
+        };
+        res.set_content(resp.dump(), "application/json");
+    });
+
+    svr.Get(R"(/api/v1/usuarios/([^/]+))", [&auth, &cfg](const httplib::Request& req, httplib::Response& res) {
+        SesionToken ses;
+        std::string err;
+        if (!auth.validar_token(req.get_header_value("Authorization"), cfg.modo_vulnerable, ses, err)) {
+            responder_error(res, 401, err);
+            return;
+        }
+
+        std::string target_id = req.matches[1];
+
+        // defensa API1 (BOLA): solo dejo consultar si es el dueño del recurso o admin
+        if (!cfg.modo_vulnerable && ses.usuario_id != target_id && ses.rol != "admin") {
+            responder_error(res, 403, "no tienes permiso para consultar este usuario");
+            return;
+        }
+
+        Usuario u;
+        if (!auth.obtener_usuario(target_id, u)) {
+            responder_error(res, 404, "usuario no encontrado");
+            return;
+        }
+
+        res.status = 200;
+        json resp = {
+            {"id", u.id},
+            {"nombre", u.nombre},
+            {"correo", u.correo},
+            {"rol", u.rol}
+        };
+        res.set_content(resp.dump(), "application/json");
+    });
+
+    svr.Patch(R"(/api/v1/usuarios/([^/]+))", [&auth, &cfg](const httplib::Request& req, httplib::Response& res) {
+        SesionToken ses;
+        std::string err;
+        if (!auth.validar_token(req.get_header_value("Authorization"), cfg.modo_vulnerable, ses, err)) {
+            responder_error(res, 401, err);
+            return;
+        }
+
+        std::string target_id = req.matches[1];
+        if (!cfg.modo_vulnerable && ses.usuario_id != target_id && ses.rol != "admin") {
+            responder_error(res, 403, "no tienes permiso para modificar este usuario");
+            return;
+        }
+
+        json body;
+        try {
+            body = json::parse(req.body);
+        } catch (...) {
+            responder_error(res, 400, "json invalido");
+            return;
+        }
+
+        // en modo blindado aplico lista blanca y rechazo campos no permitidos como rol
+        if (!cfg.modo_vulnerable) {
+            for (auto it = body.begin(); it != body.end(); ++it) {
+                if (it.key() != "nombre") {
+                    responder_error(res, 400, "campo no permitido: " + it.key());
+                    return;
+                }
+            }
+        }
+
+        std::string nuevo_nombre = body.value("nombre", "");
+        std::string nuevo_rol = body.value("rol", "");
+
+        Usuario u;
+        if (!auth.actualizar_usuario(target_id, nuevo_nombre, nuevo_rol, cfg.modo_vulnerable, u, err)) {
+            responder_error(res, 404, err);
+            return;
+        }
+
+        res.status = 200;
+        json resp = {
+            {"id", u.id},
+            {"nombre", u.nombre},
+            {"correo", u.correo},
+            {"rol", u.rol}
+        };
+        res.set_content(resp.dump(), "application/json");
+    });
+
+    svr.Post("/api/v1/pagos/cobrar", [&auth, &pagos, &cfg](const httplib::Request& req, httplib::Response& res) {
+        SesionToken ses;
+        std::string err;
+        if (!auth.validar_token(req.get_header_value("Authorization"), cfg.modo_vulnerable, ses, err)) {
+            responder_error(res, 401, err);
+            return;
+        }
+
+        json body;
+        try {
+            body = json::parse(req.body);
+        } catch (...) {
+            responder_error(res, 400, "json invalido");
+            return;
+        }
+
+        // en modo blindado solo acepto subasta_id y monto_centimos
+        if (!cfg.modo_vulnerable) {
+            for (auto it = body.begin(); it != body.end(); ++it) {
+                if (it.key() != "subasta_id" && it.key() != "monto_centimos") {
+                    responder_error(res, 400, "campo no permitido: " + it.key());
+                    return;
+                }
+            }
+        }
+
+        if (!body.contains("monto_centimos") || !body["monto_centimos"].is_number_integer()) {
+            responder_error(res, 400, "monto_centimos debe ser un entero");
+            return;
+        }
+
+        std::string subasta_id = body.value("subasta_id", "");
+        int64_t monto = body["monto_centimos"].get<int64_t>();
+
+        // falla API3: en modo vulnerable acepto usuario_id y estado enviados por el cliente
+        std::string usuario_cobro = ses.usuario_id;
+        std::string estado_cobro = "pagado";
+        if (cfg.modo_vulnerable) {
+            if (body.contains("usuario_id") && body["usuario_id"].is_string()) {
+                usuario_cobro = body["usuario_id"].get<std::string>();
+            }
+            if (body.contains("estado") && body["estado"].is_string()) {
+                estado_cobro = body["estado"].get<std::string>();
+            }
+        }
+
+        Cobro c;
+        if (!pagos.crear_cobro(usuario_cobro, subasta_id, monto, estado_cobro, c, err)) {
+            responder_error(res, 400, err);
+            return;
+        }
+
+        res.status = 201;
+        json resp = {
+            {"id", c.id},
+            {"usuario_id", c.usuario_id},
+            {"subasta_id", c.subasta_id},
+            {"monto_centimos", c.monto_centimos},
+            {"estado", c.estado},
+            {"creado_en", c.creado_en}
+        };
+        res.set_content(resp.dump(), "application/json");
+    });
+
+    svr.Get(R"(/api/v1/pagos/([^/]+))", [&auth, &pagos, &cfg](const httplib::Request& req, httplib::Response& res) {
+        SesionToken ses;
+        std::string err;
+        if (!auth.validar_token(req.get_header_value("Authorization"), cfg.modo_vulnerable, ses, err)) {
+            responder_error(res, 401, err);
+            return;
+        }
+
+        std::string cobro_id = req.matches[1];
+        Cobro c;
+        if (!pagos.obtener_cobro(cobro_id, c)) {
+            responder_error(res, 404, "cobro no encontrado");
+            return;
+        }
+
+        // defensa API1 (BOLA): evito que un usuario vea recibos de cobro ajenos
+        if (!cfg.modo_vulnerable && c.usuario_id != ses.usuario_id && ses.rol != "admin") {
+            responder_error(res, 403, "no tienes permiso para ver este cobro");
+            return;
+        }
+
+        res.status = 200;
+        json resp = {
+            {"id", c.id},
+            {"usuario_id", c.usuario_id},
+            {"subasta_id", c.subasta_id},
+            {"monto_centimos", c.monto_centimos},
+            {"estado", c.estado},
+            {"creado_en", c.creado_en}
         };
         res.set_content(resp.dump(), "application/json");
     });
