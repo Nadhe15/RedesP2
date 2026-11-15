@@ -23,6 +23,9 @@ public:
     // API4: Calcular la profundidad de la consulta
     static int calculateDepth(const ASTNode& node, int current = 0);
 
+        // API4: Calcular complejidad de la consulta
+    static int calculateComplexity(const ASTNode& node);
+
     // API6: Contar alias utilizados
     static int countAliases(const ASTNode& node);
 };

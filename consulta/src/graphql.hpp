@@ -4,14 +4,12 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <sstream>
-
+#include <cstddef>
 #include <nlohmann/json.hpp>
-#include "rest_client.hpp"
+#include <functional>
 #include "security.hpp"
 #include "grpc_client.hpp"
-
-using json = nlohmann::json;
+#include "rest_client.hpp"
 
 class GraphQLEngine {
 public:
@@ -21,47 +19,75 @@ public:
         bool isBlindado
     );
 
-    // Recibe una consulta GraphQL y devuelve su resultado JSON
-    json execute(
+    // Recibir una consulta GraphQL y devolver el resultado
+    nlohmann::json execute(
         const std::string& query,
         const std::string& token
     );
+
+    void startSubscription(
+    const std::string& query,
+    const std::string& token,
+    std::function<void(const nlohmann::json&)> onUpdate,
+    std::function<void(const grpc::Status&)> onError
+);
 
 private:
     SubastasGrpcClient& grpc_;
     UsuariosRestClient& rest_;
     bool isBlindado_;
 
-    // Parser de consultas GraphQL
-    ASTNode parse(const std::string& query);
+    // Convertir el texto GraphQL en tokens
+    std::vector<std::string> tokenize(
+        const std::string& query
+    ) const;
 
-    std::vector<ASTNode> parseSelections(
-        std::istringstream& ss
-    );
+    // Construir el arbol de la consulta
+    ASTNode parse(
+        const std::string& query
+    ) const;
 
-    std::map<std::string, std::string> parseArguments(
-        const std::string& raw
-    );
+    // Leer los campos seleccionados
+    std::vector<ASTNode> parseSelectionSet(
+        const std::vector<std::string>& tokens,
+        std::size_t& position
+    ) const;
 
-    // Resolvers
-    json resolveQuery(
-        const ASTNode& node,
-        const std::string& token
-    );
+    // Leer argumentos, incluyendo objetos input anidados
+    void parseArguments(
+        const std::vector<std::string>& tokens,
+        std::size_t& position,
+        ASTNode& node,
+        const std::string& prefix = ""
+    ) const;
 
-    json resolveMutation(
-        const ASTNode& node,
-        const std::string& token
-    );
+    // Leer un valor de un argumento
+    std::string parseValue(
+        const std::vector<std::string>& tokens,
+        std::size_t& position
+    ) const;
 
-    json resolveSubasta(
+    // Ejecutar consultas
+    nlohmann::json resolveQuery(
         const ASTNode& field,
         const std::string& token
     );
 
-    // Convierte una subasta de Protobuf a JSON
-    json subastaToJson(
-        const subastas::v1::Subasta& s,
+    // Ejecutar mutaciones
+    nlohmann::json resolveMutation(
+        const ASTNode& field,
+        const std::string& token
+    );
+
+    // Consultar una subasta mediante gRPC
+    nlohmann::json resolveSubasta(
+        const ASTNode& field,
+        const std::string& token
+    );
+
+    // Convertir una respuesta Protobuf en JSON
+    nlohmann::json subastaToJson(
+        const subastas::v1::Subasta& subasta,
         const std::vector<ASTNode>& selectedFields,
         const std::string& token
     );

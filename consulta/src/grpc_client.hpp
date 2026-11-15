@@ -1,12 +1,11 @@
 
 #pragma once
 
-// ==============================================================
 // CLIENTE gRPC -> Servicio Subastas 
-// ==============================================================
+
 
 #include <grpcpp/grpcpp.h>
-#include "../generated/subastas.grpc.pb.h"
+#include "subastas.grpc.pb.h"
 #include <google/protobuf/timestamp.pb.h>
 
 #include <cstdint>

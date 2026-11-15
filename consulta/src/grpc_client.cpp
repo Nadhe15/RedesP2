@@ -9,7 +9,7 @@
 // pruebas de comunicación sin cifrado.
 //
 // Probablemente cuando se configure TLS, coordinar certificados y configuración
-// con Rol 2 y sustituir las credenciales correspondientes.
+// con Rol 1 y sustituir las credenciales correspondientes.
 
 
 SubastasGrpcClient::SubastasGrpcClient(const std::string& target) {
