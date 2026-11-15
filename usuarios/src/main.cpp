@@ -262,6 +262,22 @@ int main() {
 
         std::string subasta_id = body.value("subasta_id", "");
         int64_t monto = body["monto_centimos"].get<int64_t>();
+        std::string idem_key = req.get_header_value("Idempotency-Key");
+
+        // si viene marca temporal en modo blindado verifico que no sea una peticion vieja
+        if (!cfg.modo_vulnerable && req.has_header("X-Timestamp")) {
+            try {
+                std::time_t ts_req = std::stoll(req.get_header_value("X-Timestamp"));
+                std::time_t ahora = std::time(nullptr);
+                if (ahora - ts_req > 60 || ts_req - ahora > 60) {
+                    responder_error(res, 409, "marca temporal expirada (replay bloqueado)");
+                    return;
+                }
+            } catch (...) {
+                responder_error(res, 400, "X-Timestamp invalido");
+                return;
+            }
+        }
 
         // falla API3: en modo vulnerable acepto usuario_id y estado enviados por el cliente
         std::string usuario_cobro = ses.usuario_id;
@@ -276,8 +292,9 @@ int main() {
         }
 
         Cobro c;
-        if (!pagos.crear_cobro(usuario_cobro, subasta_id, monto, estado_cobro, c, err)) {
-            responder_error(res, 400, err);
+        int status_cobro = 400;
+        if (!pagos.crear_cobro(usuario_cobro, subasta_id, monto, estado_cobro, idem_key, cfg.modo_vulnerable, c, err, status_cobro)) {
+            responder_error(res, status_cobro, err);
             return;
         }
 

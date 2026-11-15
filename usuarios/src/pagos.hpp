@@ -22,8 +22,11 @@ public:
                      const std::string& subasta_id,
                      int64_t monto_centimos,
                      const std::string& estado,
+                     const std::string& idempotency_key,
+                     bool modo_vulnerable,
                      Cobro& out_cobro,
-                     std::string& out_error);
+                     std::string& out_error,
+                     int& out_status);
 
     bool obtener_cobro(const std::string& cobro_id, Cobro& out_cobro);
 
@@ -31,4 +34,6 @@ private:
     std::mutex mtx_;
     int siguiente_id_ = 1;
     std::unordered_map<std::string, Cobro> cobros_por_id_;
+    // guardo clave de idempotencia por usuario para bloquear ataques de replay
+    std::unordered_map<std::string, std::string> idempotencia_;
 };
