@@ -1,0 +1,84 @@
+scalar Long
+scalar DateTime
+
+#Estados de una subasta 
+
+enum Estado {
+    ESTADO_DESCONOCIDO
+    ABIERTA
+    CERRADA
+}
+
+#Informacion de la subasta 
+
+type Subasta{
+    id: ID!
+    vendedor_id: ID!
+    titulo: String!
+    precio_salida: Long!
+    incremento_minimo: Long!
+    precio_actual: Long!
+    lider_id: ID
+    cierre: DateTime!
+    estado: Estado!
+
+    vendedor: Usuario
+}
+
+type Usuario{
+    id: ID!
+    nombre: String
+    email: String
+    subastas: [Subasta]
+}
+
+#Resultado de una puja
+
+type PujarResultado {
+    aceptada: Boolean!
+    motivo: String!
+    subasta: Subasta
+}
+
+type LoginResponse{
+    token: String
+    error: String
+}
+
+#Datos para crear subasta 
+
+input CrearSubastaInput {
+    titulo: String!
+    precio_salida: Long!
+    incremento_minimo: Long!
+    cierre: DateTime!
+}
+
+#Datos para realizar puja
+
+input PujarInput {
+    subasta_id: ID!
+    monto: Long!
+}
+
+#Consultas de Informacion
+
+type Query {
+    subasta(id: ID!): Subasta
+    me: Usuario
+}
+
+#operaciones que modifican Informacion
+
+type Mutation {
+    CrearSubasta(input: CrearSubastaInput!): Subasta
+    pujar(input: PujarInput!): PujarResultado
+
+    login(username: String!, pass: String!): LoginResponse
+}
+
+#Actualizaciones en tiempo realizar
+
+type Subscription {
+    seguirSubasta(id:ID!): Subasta!
+}
