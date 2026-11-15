@@ -1,9 +1,9 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -O2 -Wall -Wextra
-LDFLAGS := -lpthread
+CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Isrc
+LDFLAGS := -lssl -lcrypto -lpthread
 
 TARGET := bin/usuarios
-SRCS := src/main.cpp
+SRCS := src/main.cpp src/auth.cpp
 
 all: $(TARGET)
 
