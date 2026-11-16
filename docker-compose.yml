@@ -16,6 +16,23 @@ services:
     ports:
       - "50051:50051"
 
+  # Defino el contenedor de usuarios y pagos REST
+  usuarios:
+    build:
+      context: .
+      dockerfile: usuarios/Dockerfile
+    container_name: servicio_usuarios
+    environment:
+      - PORT=8080
+      - SECURITY_MODE=${SECURITY_MODE:-vulnerable}
+      - TLS_CERT_PATH=/app/certs/usuarios.crt
+      - TLS_KEY_PATH=/app/certs/usuarios.key
+      - SUBASTAS_HOST=subastas:50051
+    networks:
+      - red_backend
+    ports:
+      - "8080:8080"
+
 # Creo la red interna compartida
 networks:
   red_backend:

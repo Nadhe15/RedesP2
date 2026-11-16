@@ -33,7 +33,12 @@ static bool archivo_existe(const std::string& ruta) {
 static Config leer_config() {
     Config cfg;
 
-    if (const char* p = std::getenv("PUERTO")) {
+    // acepto PORT (usado en docker-compose) o PUERTO
+    const char* p = std::getenv("PORT");
+    if (!p || std::string(p).empty()) {
+        p = std::getenv("PUERTO");
+    }
+    if (p) {
         try {
             int val = std::stoi(p);
             if (val > 0 && val <= 65535) {
@@ -44,7 +49,11 @@ static Config leer_config() {
         }
     }
 
-    if (const char* mv = std::getenv("MODO_VULNERABLE")) {
+    // acepto SECURITY_MODE (vulnerable/blindado) o MODO_VULNERABLE (true/false)
+    if (const char* sm = std::getenv("SECURITY_MODE")) {
+        std::string v(sm);
+        cfg.modo_vulnerable = (v == "vulnerable" || v == "VULNERABLE");
+    } else if (const char* mv = std::getenv("MODO_VULNERABLE")) {
         std::string v(mv);
         cfg.modo_vulnerable = (v == "true" || v == "1" || v == "TRUE");
     }
@@ -56,16 +65,16 @@ static Config leer_config() {
         cfg.usar_tls = (v == "true" || v == "1" || v == "TRUE");
     }
 
-    if (const char* tc = std::getenv("TLS_CERT")) {
-        if (std::string(tc).size() > 0) {
-            cfg.tls_cert = tc;
-        }
+    if (const char* tc = std::getenv("TLS_CERT_PATH")) {
+        if (std::string(tc).size() > 0) cfg.tls_cert = tc;
+    } else if (const char* tc2 = std::getenv("TLS_CERT")) {
+        if (std::string(tc2).size() > 0) cfg.tls_cert = tc2;
     }
 
-    if (const char* tk = std::getenv("TLS_KEY")) {
-        if (std::string(tk).size() > 0) {
-            cfg.tls_key = tk;
-        }
+    if (const char* tk = std::getenv("TLS_KEY_PATH")) {
+        if (std::string(tk).size() > 0) cfg.tls_key = tk;
+    } else if (const char* tk2 = std::getenv("TLS_KEY")) {
+        if (std::string(tk2).size() > 0) cfg.tls_key = tk2;
     }
 
     if (const char* sh = std::getenv("SUBASTAS_HOST")) {
@@ -83,6 +92,28 @@ static void responder_error(httplib::Response& res, int status, const std::strin
     res.set_content(body.dump(), "application/json");
 }
 
+static bool parsear_objeto_json(const std::string& raw, json& out) {
+    try {
+        out = json::parse(raw);
+        return out.is_object();
+    } catch (...) {
+        return false;
+    }
+}
+
+// evito que nlohmann::json lance excepcion si un campo viene como numero o arreglo
+static bool leer_campo_string(const json& body, const std::string& clave, std::string& out) {
+    if (!body.contains(clave)) {
+        out.clear();
+        return true;
+    }
+    if (!body[clave].is_string()) {
+        return false;
+    }
+    out = body[clave].get<std::string>();
+    return true;
+}
+
 // registro todas las rutas sobre httplib::Server para compartirlas entre HTTP y HTTPS
 static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& pagos, const Config& cfg) {
     // endpoint basico para verificar que el contenedor levanto bien
@@ -98,16 +129,18 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
 
     svr.Post("/api/v1/registro", [&auth](const httplib::Request& req, httplib::Response& res) {
         json body;
-        try {
-            body = json::parse(req.body);
-        } catch (...) {
+        if (!parsear_objeto_json(req.body, body)) {
             responder_error(res, 400, "json invalido");
             return;
         }
 
-        std::string nombre = body.value("nombre", "");
-        std::string correo = body.value("correo", "");
-        std::string password = body.value("password", "");
+        std::string nombre, correo, password;
+        if (!leer_campo_string(body, "nombre", nombre) ||
+            !leer_campo_string(body, "correo", correo) ||
+            !leer_campo_string(body, "password", password)) {
+            responder_error(res, 400, "nombre, correo y password deben ser texto");
+            return;
+        }
 
         Usuario u;
         std::string err;
@@ -129,15 +162,17 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
 
     svr.Post("/api/v1/login", [&auth, &cfg](const httplib::Request& req, httplib::Response& res) {
         json body;
-        try {
-            body = json::parse(req.body);
-        } catch (...) {
+        if (!parsear_objeto_json(req.body, body)) {
             responder_error(res, 400, "json invalido");
             return;
         }
 
-        std::string correo = body.value("correo", "");
-        std::string password = body.value("password", "");
+        std::string correo, password;
+        if (!leer_campo_string(body, "correo", correo) ||
+            !leer_campo_string(body, "password", password)) {
+            responder_error(res, 400, "correo y password deben ser texto");
+            return;
+        }
 
         SesionToken ses;
         std::string err;
@@ -221,9 +256,7 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
         }
 
         json body;
-        try {
-            body = json::parse(req.body);
-        } catch (...) {
+        if (!parsear_objeto_json(req.body, body)) {
             responder_error(res, 400, "json invalido");
             return;
         }
@@ -238,8 +271,12 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
             }
         }
 
-        std::string nuevo_nombre = body.value("nombre", "");
-        std::string nuevo_rol = body.value("rol", "");
+        std::string nuevo_nombre, nuevo_rol;
+        if (!leer_campo_string(body, "nombre", nuevo_nombre) ||
+            !leer_campo_string(body, "rol", nuevo_rol)) {
+            responder_error(res, 400, "los campos deben ser texto");
+            return;
+        }
 
         Usuario u;
         if (!auth.actualizar_usuario(target_id, nuevo_nombre, nuevo_rol, cfg.modo_vulnerable, u, err)) {
@@ -266,9 +303,7 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
         }
 
         json body;
-        try {
-            body = json::parse(req.body);
-        } catch (...) {
+        if (!parsear_objeto_json(req.body, body)) {
             responder_error(res, 400, "json invalido");
             return;
         }
@@ -288,14 +323,25 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
             return;
         }
 
-        std::string subasta_id = body.value("subasta_id", "");
+        std::string subasta_id;
+        if (!leer_campo_string(body, "subasta_id", subasta_id)) {
+            responder_error(res, 400, "subasta_id debe ser texto");
+            return;
+        }
+
         int64_t monto = body["monto_centimos"].get<int64_t>();
         std::string idem_key = req.get_header_value("Idempotency-Key");
 
         // si viene marca temporal en modo blindado verifico que no sea una peticion vieja
         if (!cfg.modo_vulnerable && req.has_header("X-Timestamp")) {
             try {
-                std::time_t ts_req = std::stoll(req.get_header_value("X-Timestamp"));
+                std::string ts_str = req.get_header_value("X-Timestamp");
+                size_t idx = 0;
+                std::time_t ts_req = std::stoll(ts_str, &idx);
+                if (idx != ts_str.size()) {
+                    responder_error(res, 400, "X-Timestamp invalido");
+                    return;
+                }
                 std::time_t ahora = std::time(nullptr);
                 if (ahora - ts_req > 60 || ts_req - ahora > 60) {
                     responder_error(res, 409, "marca temporal expirada (replay bloqueado)");
