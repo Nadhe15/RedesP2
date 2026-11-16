@@ -1,0 +1,22 @@
+services:
+  # Defino el contenedor de subastas
+  subastas:
+    build:
+      context: .
+      dockerfile: subastas/Dockerfile
+    container_name: servicio_subastas
+    # Configuro las variables de entorno
+    environment:
+      - PORT=50051
+      - SECURITY_MODE=${SECURITY_MODE:-vulnerable}
+      - TLS_CERT_PATH=/app/certs/server.crt
+      - TLS_KEY_PATH=/app/certs/server.key
+    networks:
+      - red_backend
+    ports:
+      - "50051:50051"
+
+# Creo la red interna compartida
+networks:
+  red_backend:
+    driver: bridge
