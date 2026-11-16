@@ -1,8 +1,12 @@
 #include <cstdint>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <string>
 
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#endif
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
@@ -14,8 +18,16 @@ using json = nlohmann::json;
 struct Config {
     int puerto = 8080;
     bool modo_vulnerable = false;
+    bool usar_tls = true;
+    std::string tls_cert = "/app/certs/usuarios.crt";
+    std::string tls_key = "/app/certs/usuarios.key";
     std::string subastas_host = "subastas:50051";
 };
+
+static bool archivo_existe(const std::string& ruta) {
+    std::ifstream f(ruta);
+    return f.good();
+}
 
 // cargo la configuracion desde variables de entorno para cambiar de modo en docker compose
 static Config leer_config() {
@@ -37,6 +49,25 @@ static Config leer_config() {
         cfg.modo_vulnerable = (v == "true" || v == "1" || v == "TRUE");
     }
 
+    // en modo vulnerable apago TLS para permitir la intercepcion de trafico en claro
+    cfg.usar_tls = !cfg.modo_vulnerable;
+    if (const char* ut = std::getenv("USAR_TLS")) {
+        std::string v(ut);
+        cfg.usar_tls = (v == "true" || v == "1" || v == "TRUE");
+    }
+
+    if (const char* tc = std::getenv("TLS_CERT")) {
+        if (std::string(tc).size() > 0) {
+            cfg.tls_cert = tc;
+        }
+    }
+
+    if (const char* tk = std::getenv("TLS_KEY")) {
+        if (std::string(tk).size() > 0) {
+            cfg.tls_key = tk;
+        }
+    }
+
     if (const char* sh = std::getenv("SUBASTAS_HOST")) {
         if (std::string(sh).size() > 0) {
             cfg.subastas_host = sh;
@@ -52,18 +83,15 @@ static void responder_error(httplib::Response& res, int status, const std::strin
     res.set_content(body.dump(), "application/json");
 }
 
-int main() {
-    Config cfg = leer_config();
-    AuthStore auth;
-    PagosStore pagos;
-    httplib::Server svr;
-
+// registro todas las rutas sobre httplib::Server para compartirlas entre HTTP y HTTPS
+static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& pagos, const Config& cfg) {
     // endpoint basico para verificar que el contenedor levanto bien
     svr.Get("/health", [&cfg](const httplib::Request&, httplib::Response& res) {
         json body = {
             {"status", "ok"},
             {"servicio", "usuarios"},
-            {"modo_vulnerable", cfg.modo_vulnerable}
+            {"modo_vulnerable", cfg.modo_vulnerable},
+            {"tls", cfg.usar_tls}
         };
         res.set_content(body.dump(), "application/json");
     });
@@ -342,14 +370,46 @@ int main() {
         };
         res.set_content(resp.dump(), "application/json");
     });
+}
 
-    std::cout << "[usuarios] escuchando en 0.0.0.0:" << cfg.puerto
-              << " (modo_vulnerable=" << (cfg.modo_vulnerable ? "true" : "false")
-              << ", subastas=" << cfg.subastas_host << ")" << std::endl;
+int main() {
+    Config cfg = leer_config();
+    AuthStore auth;
+    PagosStore pagos;
 
-    if (!svr.listen("0.0.0.0", cfg.puerto)) {
-        std::cerr << "[usuarios] error al iniciar el servidor en el puerto " << cfg.puerto << std::endl;
-        return 1;
+    if (cfg.usar_tls) {
+        if (!archivo_existe(cfg.tls_cert) || !archivo_existe(cfg.tls_key)) {
+            std::cerr << "[usuarios] faltan certificados TLS en " << cfg.tls_cert
+                      << " y " << cfg.tls_key << std::endl;
+            return 1;
+        }
+
+        httplib::SSLServer svr(cfg.tls_cert.c_str(), cfg.tls_key.c_str());
+        if (!svr.is_valid()) {
+            std::cerr << "[usuarios] no se pudo inicializar el contexto SSL/TLS" << std::endl;
+            return 1;
+        }
+
+        registrar_rutas(svr, auth, pagos, cfg);
+        std::cout << "[usuarios] escuchando en HTTPS 0.0.0.0:" << cfg.puerto
+                  << " (modo_vulnerable=" << (cfg.modo_vulnerable ? "true" : "false")
+                  << ", subastas=" << cfg.subastas_host << ")" << std::endl;
+
+        if (!svr.listen("0.0.0.0", cfg.puerto)) {
+            std::cerr << "[usuarios] error al iniciar el servidor HTTPS en el puerto " << cfg.puerto << std::endl;
+            return 1;
+        }
+    } else {
+        httplib::Server svr;
+        registrar_rutas(svr, auth, pagos, cfg);
+        std::cout << "[usuarios] escuchando en HTTP 0.0.0.0:" << cfg.puerto
+                  << " (modo_vulnerable=" << (cfg.modo_vulnerable ? "true" : "false")
+                  << ", subastas=" << cfg.subastas_host << ")" << std::endl;
+
+        if (!svr.listen("0.0.0.0", cfg.puerto)) {
+            std::cerr << "[usuarios] error al iniciar el servidor HTTP en el puerto " << cfg.puerto << std::endl;
+            return 1;
+        }
     }
 
     return 0;

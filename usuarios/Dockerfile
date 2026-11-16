@@ -17,9 +17,10 @@ RUN make
 
 FROM debian:trixie-slim
 
-# ca-certificates y librerias de ejecucion para el binario compilado
+# ca-certificates, openssl y librerias de ejecucion para el binario compilado
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    openssl \
     libcpp-httplib0.18 \
     libssl3t64 \
     libstdc++6 \
@@ -28,8 +29,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /app/bin/usuarios /app/usuarios
 
+# genero certificados autofirmados por defecto si el compose no monta unos propios
+RUN mkdir -p /app/certs && \
+    openssl req -x509 -newkey rsa:2048 -nodes \
+      -keyout /app/certs/usuarios.key \
+      -out /app/certs/usuarios.crt \
+      -days 30 \
+      -subj "/CN=usuarios" \
+      -addext "subjectAltName=DNS:usuarios,DNS:localhost,IP:127.0.0.1"
+
 ENV PUERTO=8080
 ENV MODO_VULNERABLE=false
+ENV TLS_CERT=/app/certs/usuarios.crt
+ENV TLS_KEY=/app/certs/usuarios.key
 ENV SUBASTAS_HOST=subastas:50051
 
 EXPOSE 8080
