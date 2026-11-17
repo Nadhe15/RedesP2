@@ -72,6 +72,8 @@ public:
 
 private:
     std::unique_ptr<Subastas::Stub> stub_;
+
+    //certificado de autenticacion 
     std::string caPath_;
 
     // Control de la subscripcion activa
