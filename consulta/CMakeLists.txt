@@ -71,6 +71,7 @@ add_executable(consulta
     src/grpc_client.cpp
     src/rest_client.cpp
     src/security.cpp
+    src/rest_client.cpp
     generated/subastas.pb.cc
     generated/subastas.grpc.pb.cc
 )
