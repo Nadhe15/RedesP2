@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libgrpc++-dev \
     libprotobuf-dev \
+    nlohmann-json3-dev \
     protobuf-compiler \
     protobuf-compiler-grpc \
     ca-certificates \
@@ -18,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /src
 COPY consulta/ /src/consulta/
+
+RUN git ls-remote https://github.com/CrowCpp/Crow.git v1.0+5
 
 WORKDIR /src/consulta/build
 RUN cmake .. && cmake --build . -j"$(nproc)"

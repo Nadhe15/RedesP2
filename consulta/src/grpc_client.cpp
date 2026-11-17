@@ -5,40 +5,43 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-// Se tiene que utilizar TLS/mTLS.
-// Puse InsecureChannelCredentials() para las
-// pruebas de comunicación sin cifrado.
-//
-// Probablemente cuando se configure TLS, coordinar certificados y configuración
-// con Rol 1 y sustituir las credenciales correspondientes.
 
 
 SubastasGrpcClient::SubastasGrpcClient(
     const std::string& target,
-    const std::string& caPath
+    const std::string& caPath,
+    bool usarTls
 ) {
-    std::ifstream caFile(caPath);
-    if (!caFile) {
-        throw std::runtime_error(
-            "No se pudo abrir el archivo de certificado CA: " + caPath
-        );
-    }
+    std::shared_ptr<grpc::ChannelCredentials> credentials;
 
-    std::stringstream buffer;
-    buffer << caFile.rdbuf();
+    if (usarTls) {
+        std::ifstream caFile(caPath);
+        if (!caFile) {
+            throw std::runtime_error(
+                "No se pudo abrir el archivo de certificado CA: " + caPath
+            );
+        }
 
-    grpc::SslCredentialsOptions tlsOptions;
-    tlsOptions.pem_root_certs = buffer.str();
+        std::stringstream buffer;
+        buffer << caFile.rdbuf();
 
-    if (tlsOptions.pem_root_certs.empty()) {
-        throw std::runtime_error(
-            "El archivo de certificado CA está vacío: " + caPath
-        );
+        grpc::SslCredentialsOptions tlsOptions;
+        tlsOptions.pem_root_certs = buffer.str();
+
+        if (tlsOptions.pem_root_certs.empty()) {
+            throw std::runtime_error(
+                "El archivo de certificado CA está vacío: " + caPath
+            );
+        }
+
+        credentials = grpc::SslCredentials(tlsOptions);
+    } else {
+        credentials = grpc::InsecureChannelCredentials();
     }
 
     auto channel = grpc::CreateChannel(
         target,
-        grpc::SslCredentials(tlsOptions)
+        credentials
     );
 
     stub_ = Subastas::NewStub(channel);

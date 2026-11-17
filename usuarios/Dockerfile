@@ -30,18 +30,18 @@ WORKDIR /app
 COPY --from=builder /app/bin/usuarios /app/usuarios
 
 # genero certificados autofirmados por defecto si el compose no monta unos propios
-RUN mkdir -p /app/certs && \
-    openssl req -x509 -newkey rsa:2048 -nodes \
-      -keyout /app/certs/usuarios.key \
-      -out /app/certs/usuarios.crt \
-      -days 30 \
-      -subj "/CN=usuarios" \
-      -addext "subjectAltName=DNS:usuarios,DNS:localhost,IP:127.0.0.1"
+# RUN mkdir -p /usuarios/certs && \
+#     openssl req -x509 -newkey rsa:2048 -nodes \
+#       -keyout /app/certs/usuarios.key \
+#       -out /app/certs/usuarios.crt \
+#       -days 30 \
+#       -subj "/CN=usuarios" \
+#       -addext "subjectAltName=DNS:usuarios,DNS:localhost,IP:127.0.0.1"
 
 ENV PUERTO=8080
 ENV MODO_VULNERABLE=false
-ENV TLS_CERT=/app/certs/usuarios.crt
-ENV TLS_KEY=/app/certs/usuarios.key
+ENV TLS_CERT_PATH=/run/tls/usuarios.crt
+ENV TLS_KEY_PATH=/run/tls/usuarios.key
 ENV SUBASTAS_HOST=subastas:50051
 
 EXPOSE 8080

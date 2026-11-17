@@ -52,14 +52,17 @@ int main() {
     const char* grpcEnv = std::getenv("SUBASTAS_GRPC_URL");
     const char* restEnv = std::getenv("USUARIOS_REST_URL");
     const char* caEnv = std::getenv("SUBASTAS_CA_PATH");
+    const char* usuariosCaEnv = std::getenv("USUARIOS_CA_PATH");
     const char* portEnv = std::getenv("PORT");
-
-    std::string mode = secEnv ? secEnv : "vulnerable";
+    
+    std::string usuariosCaPath = usuariosCaEnv ? usuariosCaEnv : "";
+    std::string mode = secEnv ? secEnv : "blindado";
     std::string grpcUrl = grpcEnv ? grpcEnv : "subastas:50051";
-    std::string restUrl = restEnv ? restEnv : "http://usuarios:8080";
+    bool isBlindado = (mode == "blindado" || mode == "hardened");
+    std::string restUrl = restEnv && *restEnv
+        ? restEnv
+        : (isBlindado ? "https://usuarios:8080" : "http://usuarios:8080");
     int port = portEnv ? std::stoi(portEnv) : 4000;
-
-    bool isBlindado = (mode == "blindado");
 
     std::cout << "Servicio Consulta GraphQL\n"
               << "Modo: " << (isBlindado ? "BLINDADO" : "VULNERABLE") << "\n"
@@ -67,7 +70,7 @@ int main() {
               << "REST: " << restUrl << "\n"
               << "Puerto: " << port << "\n";
 
-    if (caEnv == nullptr || *caEnv == '\0') {
+    if (isBlindado && (caEnv == nullptr || *caEnv == '\0')) {
         std::cerr << "Falta configurar la variable SUBASTAS_CA_PATH" << std::endl;
         return 1;
     }
@@ -75,13 +78,17 @@ int main() {
     std::unique_ptr<SubastasGrpcClient> grpcClient;
 
     try {
-        grpcClient = std::make_unique<SubastasGrpcClient>(grpcUrl, caEnv);
+        grpcClient = std::make_unique<SubastasGrpcClient>(
+            grpcUrl,
+            caEnv ? caEnv : "",
+            isBlindado
+        );
     } catch (const std::exception& e) {
         std::cerr << "Error al inicializar el cliente gRPC: " << e.what() << std::endl;
         return 1;
     }
 
-    UsuariosRestClient restClient(restUrl);
+    UsuariosRestClient restClient(restUrl, usuariosCaPath);
     GraphQLEngine engine(*grpcClient, restClient, isBlindado);
 
     crow::SimpleApp app;

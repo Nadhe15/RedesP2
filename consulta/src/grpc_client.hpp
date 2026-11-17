@@ -25,7 +25,8 @@ class SubastasGrpcClient {
 public:
     explicit SubastasGrpcClient(
         const std::string& target,
-        const std::string& caPath
+        const std::string& caPath,
+        bool usarTls
     );
 
     ~SubastasGrpcClient();
@@ -72,6 +73,9 @@ public:
 
 private:
     std::unique_ptr<Subastas::Stub> stub_;
+
+    //certificado de autenticacion 
+    std::string caPath_;
 
     // Control de la subscripcion activa
     std::thread streamThread_;

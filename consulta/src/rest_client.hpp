@@ -12,7 +12,10 @@ using json = nlohmann::json;
 // Cliente REST para el servicio Usuarios/Pagos
 class UsuariosRestClient {
 public:
-    explicit UsuariosRestClient(const std::string& baseUrl);
+    explicit UsuariosRestClient(
+        const std::string& baseUrl, 
+        const std::string& caPath
+    );
 
     // Obtener un usuario por ID
     json obtenerUsuario(
@@ -31,6 +34,7 @@ public:
 
 private:
     std::string baseUrl_;
+    std::string caPath_;
 
     static std::size_t writeCallback(
         void* contents,

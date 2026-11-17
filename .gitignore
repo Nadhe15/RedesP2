@@ -1,0 +1,9 @@
+# Ignoro carpetas de compilacion
+build/
+bin/
+*.o
+*.a
+*.so
+.vscode/
+usuarios/certs/*.key
+.env
