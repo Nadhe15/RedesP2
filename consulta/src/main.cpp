@@ -83,7 +83,7 @@ int main() {
         return 1;
     }
 
-    UsuariosRestClient restClient(restUrl);
+    UsuariosRestClient restClient(restUrl, usuariosCaPath);
     GraphQLEngine engine(*grpcClient, restClient, isBlindado);
 
     crow::SimpleApp app;
