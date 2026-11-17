@@ -230,12 +230,14 @@ if (url.compare(0,8, "https://")==0){
 
 json UsuariosRestClient::httpGet(
     const std::string& path,
-    const std::string& token
+    const std::string& token,
+    const std::string& caPath
 ) {
     return realizarPeticion(
         unirUrl(baseUrl_, path),
         token,
         nullptr,
+        caPath,
         &UsuariosRestClient::writeCallback
     );
 }
@@ -244,11 +246,13 @@ json UsuariosRestClient::httpPost(
     const std::string& path,
     const json& body,
     const std::string& token
+    const std::string& caPath
 ) {
     return realizarPeticion(
         unirUrl(baseUrl_, path),
         token,
         &body,
+        caPath,
         &UsuariosRestClient::writeCallback
     );
 }
