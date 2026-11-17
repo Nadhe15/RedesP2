@@ -5,3 +5,5 @@ bin/
 *.a
 *.so
 .vscode/
+usuarios/certs/*.key
+.env

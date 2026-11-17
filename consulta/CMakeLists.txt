@@ -16,6 +16,8 @@ FetchContent_Declare(
     Crow
     GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
     GIT_TAG v1.0+5
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
 )
 FetchContent_MakeAvailable(Crow)
 
@@ -27,6 +29,8 @@ if(NOT nlohmann_json_FOUND)
         nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
         GIT_TAG v3.11.3
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(nlohmann_json)
 endif()

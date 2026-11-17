@@ -25,7 +25,8 @@ class SubastasGrpcClient {
 public:
     explicit SubastasGrpcClient(
         const std::string& target,
-        const std::string& caPath
+        const std::string& caPath,
+        bool usarTls
     );
 
     ~SubastasGrpcClient();

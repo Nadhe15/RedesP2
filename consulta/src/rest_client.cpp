@@ -121,6 +121,19 @@ json realizarPeticion(
     HeaderHandle headers(rawHeaders, curl_slist_free_all);
 
     curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
+
+    if (url.compare(0, 8, "https://") == 0) {
+        if (caPath.empty()) {
+            throw std::runtime_error(
+                "Falta configurar la CA para la conexión HTTPS con Usuarios"
+            );
+        }
+
+        curl_easy_setopt(curl.get(), CURLOPT_CAINFO, caPath.c_str());
+        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 2L);
+    }
+
     curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, headers.get());
     curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, writeCallback);
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &respuesta);
@@ -216,28 +229,15 @@ std::size_t UsuariosRestClient::writeCallback(
     return bytes;
 }
 
-if (url.compare(0,8, "https://")==0){
-    if(caPath.empty()){
-        throw std::runtime_error(
-            "Falta configurar la CA para la conexion HTTPS con los usuarios"
-        );
-    }
-    curl_easy_setopt(curl.get(), CURLOPT_CAINFO, caPath.c_str());
-    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 1L);
-    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 2L);
-
-}
-
 json UsuariosRestClient::httpGet(
     const std::string& path,
-    const std::string& token,
-    const std::string& caPath
+    const std::string& token
 ) {
     return realizarPeticion(
         unirUrl(baseUrl_, path),
         token,
+        caPath_,
         nullptr,
-        caPath,
         &UsuariosRestClient::writeCallback
     );
 }
@@ -246,13 +246,12 @@ json UsuariosRestClient::httpPost(
     const std::string& path,
     const json& body,
     const std::string& token
-    const std::string& caPath
 ) {
     return realizarPeticion(
         unirUrl(baseUrl_, path),
         token,
+        caPath_,
         &body,
-        caPath,
         &UsuariosRestClient::writeCallback
     );
 }

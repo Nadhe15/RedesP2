@@ -30,13 +30,13 @@ WORKDIR /app
 COPY --from=builder /app/bin/usuarios /app/usuarios
 
 # genero certificados autofirmados por defecto si el compose no monta unos propios
-RUN mkdir -p /usuarios/certs && \
-    openssl req -x509 -newkey rsa:2048 -nodes \
-      -keyout /app/certs/usuarios.key \
-      -out /app/certs/usuarios.crt \
-      -days 30 \
-      -subj "/CN=usuarios" \
-      -addext "subjectAltName=DNS:usuarios,DNS:localhost,IP:127.0.0.1"
+# RUN mkdir -p /usuarios/certs && \
+#     openssl req -x509 -newkey rsa:2048 -nodes \
+#       -keyout /app/certs/usuarios.key \
+#       -out /app/certs/usuarios.crt \
+#       -days 30 \
+#       -subj "/CN=usuarios" \
+#       -addext "subjectAltName=DNS:usuarios,DNS:localhost,IP:127.0.0.1"
 
 ENV PUERTO=8080
 ENV MODO_VULNERABLE=false
