@@ -14,7 +14,7 @@ class UsuariosRestClient {
 public:
     explicit UsuariosRestClient(
         const std::string& baseUrl, 
-        const std::string& caPath = {}
+        const std::string& caPath
     );
 
     // Obtener un usuario por ID
