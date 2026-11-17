@@ -8,9 +8,9 @@ services:
     # Configuro las variables de entorno
     environment:
       - PORT: 50051
-      - SECURITY_MODE: ${SECURITY_MODE:-vulnerable}
-      - TLS_CERT_PATH: /app/certs/server.crt
-      - TLS_KEY_PATH: /app/certs/server.key
+      - SECURITY_MODE: ${SECURITY_MODE:-hardened}
+      - TLS_CERT_PATH: /run/tls/server.crt
+      - TLS_KEY_PATH: /run/tls/server.key
 
     volumes: 
       - ./subastas/certs:/run/tls:ro

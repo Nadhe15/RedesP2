@@ -66,9 +66,22 @@ int main() {
               << "REST: " << restUrl << "\n"
               << "Puerto: " << port << "\n";
 
-    SubastasGrpcClient grpcClient(grpcUrl);
-    UsuariosRestClient restClient(restUrl);
-    GraphQLEngine engine(grpcClient, restClient, isBlindado);
+    if (caEnv == nullptr || *caEnv == '\0') {
+        std::cerr << "Falta configurar la variable SUBASTAS_CA_PATH" << std::endl;
+        return 1;
+    }
+
+    std::unique_ptr<SubastasGrpcClient> grpcClient;
+
+    try {
+        grpcClient = std::make_unique<SubastasGrpcClient>(grpcUrl, caEnv);
+    } catch (const std::exception& e) {
+        std::cerr << "Error al inicializar el cliente gRPC: " << e.what() << std::endl;
+        return 1;
+    }
+
+    UsuarioRestClient restClient(restUrl);
+    GraphQLEngine engine(*grpcClient, restClient, isBlindado);
 
     crow::SimpleApp app;
 
