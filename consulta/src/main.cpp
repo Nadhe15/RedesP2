@@ -51,6 +51,7 @@ int main() {
     const char* secEnv = std::getenv("SECURITY_MODE");
     const char* grpcEnv = std::getenv("SUBASTAS_GRPC_URL");
     const char* restEnv = std::getenv("USUARIOS_REST_URL");
+    const char* caEnv = std::getenv("SUBASTAS_CA_PATH");
     const char* portEnv = std::getenv("PORT");
 
     std::string mode = secEnv ? secEnv : "vulnerable";
@@ -80,7 +81,7 @@ int main() {
         return 1;
     }
 
-    UsuarioRestClient restClient(restUrl);
+    UsuariosRestClient restClient(restUrl);
     GraphQLEngine engine(*grpcClient, restClient, isBlindado);
 
     crow::SimpleApp app;
@@ -257,7 +258,7 @@ int main() {
     }
 
     if (cancelar) {
-        grpcClient.CancelarSeguir();
+        grpcClient->CancelarSeguir();
     }
 }
 

@@ -13,24 +13,27 @@
 // con Rol 1 y sustituir las credenciales correspondientes.
 
 
-SubastasGrpcClient::SubastasGrpcClient(c
-    onst std::string& target, 
+SubastasGrpcClient::SubastasGrpcClient(
+    const std::string& target,
     const std::string& caPath
- ) {
-    //NOTE: ya cmabie lo de las credenciales inseguras 
+) {
     std::ifstream caFile(caPath);
-    if(!caFile){
-        throw std::runtime_error("No se pudo abrir el archivo de certificado CA :( : " + caPath);
+    if (!caFile) {
+        throw std::runtime_error(
+            "No se pudo abrir el archivo de certificado CA: " + caPath
+        );
     }
-    
-    std::stringstream buffer; 
+
+    std::stringstream buffer;
     buffer << caFile.rdbuf();
 
     grpc::SslCredentialsOptions tlsOptions;
     tlsOptions.pem_root_certs = buffer.str();
 
     if (tlsOptions.pem_root_certs.empty()) {
-        throw std::runtime_error("El archivo de certificado CA está vacío >-<: " + caPath);
+        throw std::runtime_error(
+            "El archivo de certificado CA está vacío: " + caPath
+        );
     }
 
     auto channel = grpc::CreateChannel(

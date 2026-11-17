@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Makefile .
-COPY src/ ./src/
+COPY usuarios/Makefile ./Makefile
+COPY usuarios/src/ ./src/
 
 RUN make
 

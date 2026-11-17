@@ -6,15 +6,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
+    libboost-date-time-dev \
+    libboost-system-dev \
     libcurl4-openssl-dev \
     libgrpc++-dev \
     libprotobuf-dev \
     protobuf-compiler \
+    protobuf-compiler-grpc \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY consulta/ src/consulta/
+COPY consulta/ /src/consulta/
 
 WORKDIR /src/consulta/build
 RUN cmake .. && cmake --build . -j"$(nproc)"
@@ -35,4 +38,4 @@ COPY --from=builder /src/consulta/build/consulta /app/consulta
 ENV PORT=4000
 EXPOSE 4000
 
-CMD ["app/consulta"]
+CMD ["/app/consulta"]
