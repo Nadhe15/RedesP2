@@ -72,6 +72,7 @@ public:
 
 private:
     std::unique_ptr<Subastas::Stub> stub_;
+    std::string caPath_;
 
     // Control de la subscripcion activa
     std::thread streamThread_;
