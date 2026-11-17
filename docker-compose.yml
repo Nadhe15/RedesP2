@@ -47,7 +47,7 @@ services:
       PORT: "4000"
       SECURITY_MODE: ${CONSULTA_SECURITY_MODE:-blindado}
       SUBASTAS_GRPC_URL: subastas:50051
-      USUARIOS_REST_URL: http://usuarios:8080
+      USUARIOS_REST_URL: https://usuarios:8080
       SUBASTAS_CA_PATH: /run/tls/server.crt
       USUARIOS_CA_PATH: /run/tls/usuarios.crt
     volumes:
