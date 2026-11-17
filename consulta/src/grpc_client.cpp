@@ -1,9 +1,10 @@
 
 #include "grpc_client.hpp"
-
 #include <thread>
 #include <utility>
-
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
 // Se tiene que utilizar TLS/mTLS.
 // Puse InsecureChannelCredentials() para las
 // pruebas de comunicación sin cifrado.
@@ -12,15 +13,33 @@
 // con Rol 1 y sustituir las credenciales correspondientes.
 
 
-SubastasGrpcClient::SubastasGrpcClient(const std::string& target) {
+SubastasGrpcClient::SubastasGrpcClient(c
+    onst std::string& target, 
+    const std::string& caPath
+ ) {
+    //NOTE: ya cmabie lo de las credenciales inseguras 
+    std::ifstream caFile(caPath);
+    if(!caFile){
+        throw std::runtime_error("No se pudo abrir el archivo de certificado CA :( : " + caPath);
+    }
+    
+    std::stringstream buffer; 
+    buffer << caFile.rdbuf();
+
+    grpc::SslCredentialsOptions tlsOptions;
+    tlsOptions.pem_root_certs = buffer.str();
+
+    if (tlsOptions.pem_root_certs.empty()) {
+        throw std::runtime_error("El archivo de certificado CA está vacío >-<: " + caPath);
+    }
+
     auto channel = grpc::CreateChannel(
         target,
-        grpc::InsecureChannelCredentials() // cambiaaaaar.
+        grpc::SslCredentials(tlsOptions)
     );
 
     stub_ = Subastas::NewStub(channel);
 }
-
 // Destructor: cancelar y esperar cualquier suscripción activa
 SubastasGrpcClient::~SubastasGrpcClient() {
     CancelarSeguir();
