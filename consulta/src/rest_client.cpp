@@ -63,9 +63,11 @@ std::string codificarSegmento(const std::string& valor) {
     return resultado;
 }
 
+//agregamos el caPath a realizarPeticion  
 json realizarPeticion(
     const std::string& url,
     const std::string& token,
+    const std::string& caPath,
     const json* cuerpo,
     std::size_t (*writeCallback)(
         void*,
@@ -178,11 +180,15 @@ json realizarPeticion(
 
 } // namespace
 
-UsuariosRestClient::UsuariosRestClient(const std::string& baseUrl)
-    : baseUrl_(baseUrl) {
+//Ahora el constructor de la clase recibe el certificado de autenticacion 
+UsuariosRestClient::UsuariosRestClient(
+    const std::string& baseUrl, 
+    const std::string& caPath
+)
+    : baseUrl_(baseUrl), caPath_(caPath) {
     if (baseUrl_.empty()) {
         throw std::invalid_argument(
-            "La URL base de Usuarios no puede estar vacía"
+            "La URL base de Usuarios no puede estar vacía :("
         );
     }
 }
@@ -208,6 +214,18 @@ std::size_t UsuariosRestClient::writeCallback(
     }
 
     return bytes;
+}
+
+if (url.compare(0,8, "https://")==0){
+    if(caPath.empty()){
+        throw std::runtime_error(
+            "Falta configurar la CA para la conexion HTTPS con los usuarios"
+        );
+    }
+    curl_easy_setopt(curl.get(), CURLOPT_CAINFO, caPath.c_str());
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 2L);
+
 }
 
 json UsuariosRestClient::httpGet(
