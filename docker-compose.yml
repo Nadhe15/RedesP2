@@ -7,10 +7,13 @@ services:
     container_name: servicio_subastas
     # Configuro las variables de entorno
     environment:
-      - PORT=50051
-      - SECURITY_MODE=${SECURITY_MODE:-vulnerable}
-      - TLS_CERT_PATH=/app/certs/server.crt
-      - TLS_KEY_PATH=/app/certs/server.key
+      - PORT: 50051
+      - SECURITY_MODE: ${SECURITY_MODE:-vulnerable}
+      - TLS_CERT_PATH: /app/certs/server.crt
+      - TLS_KEY_PATH: /app/certs/server.key
+
+    volumes: 
+      - ./subastas/certs:/run/tls:ro
     networks:
       - red_backend
     ports:
@@ -23,16 +26,36 @@ services:
       dockerfile: usuarios/Dockerfile
     container_name: servicio_usuarios
     environment:
-      - PORT=8080
-      - SECURITY_MODE=${SECURITY_MODE:-vulnerable}
-      - TLS_CERT_PATH=/app/certs/usuarios.crt
-      - TLS_KEY_PATH=/app/certs/usuarios.key
-      - SUBASTAS_HOST=subastas:50051
+      - PORT: 8080
+      - SECURITY_MODE: ${SECURITY_MODE:-vulnerable}
+      - TLS_CERT_PATH: /app/certs/usuarios.crt
+      - TLS_KEY_PATH: /app/certs/usuarios.key
+      - SUBASTAS_HOST: subastas:50051
     networks:
       - red_backend
     ports:
       - "8080:8080"
 
+consulta: 
+  build: 
+    context: .
+    dockerfile: consulta/Dockerfile
+  container_name: servicio_consulta
+  environment:
+    PORT: "4000"
+    SECURITY_MODE: ${CONSULTA_SECURITY_MODE:-blindado}
+    SUBASTAS_GRPC_URL: subastas:50051
+    USUARIOS_REST_URL: http://usuarios:8080
+    SUBASTAS_CA_PATH: /run/tls/server.crt
+  volumes:
+    - ./subastas/certs/server.crt:/run/tls/server.crt:ro
+  ports: 
+    "4000:4000"
+  depends_on:
+    - subastas
+    - usuarios
+  networks:
+    - red_backend
 # Creo la red interna compartida
 networks:
   red_backend:
