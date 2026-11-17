@@ -1,0 +1,92 @@
+#include "subastas_service.hpp"
+#include <iostream>
+
+SubastasServiceImpl::SubastasServiceImpl(SubastaManager& manager, bool modo_blindado)
+    : manager_(manager), modo_blindado_(modo_blindado) {}
+
+grpc::Status SubastasServiceImpl::ValidarAutorizacion(grpc::ServerContext* context) {
+    if (!modo_blindado_) {
+        return grpc::Status::OK;
+    }
+
+    // Compruebo los metadatos de autorizacion
+    const auto& metadatos = context->client_metadata();
+    auto it = metadatos.find("authorization");
+    if (it == metadatos.end()) {
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Acceso denegado por falta de cabecera authorization");
+    }
+
+    std::string token(it->second.data(), it->second.length());
+    if (token.rfind("Bearer ", 0) != 0 || token.length() <= 7) {
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Token de autorizacion invalido");
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status SubastasServiceImpl::Crear(grpc::ServerContext* context, const subastas::v1::Subasta* request, subastas::v1::Subasta* response) {
+    auto estado_auth = ValidarAutorizacion(context);
+    if (!estado_auth.ok()) {
+        return estado_auth;
+    }
+
+    std::string error;
+    if (!manager_.CrearSubasta(*request, *response, error)) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, error);
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status SubastasServiceImpl::Pujar(grpc::ServerContext* context, const subastas::v1::PujarReq* request, subastas::v1::PujarResp* response) {
+    auto estado_auth = ValidarAutorizacion(context);
+    if (!estado_auth.ok()) {
+        return estado_auth;
+    }
+
+    manager_.ProcesarPuja(request->subasta_id(), request->usuario_id(), request->monto(), *response);
+    return grpc::Status::OK;
+}
+
+grpc::Status SubastasServiceImpl::Obtener(grpc::ServerContext* context, const subastas::v1::SubastaId* request, subastas::v1::Subasta* response) {
+    auto estado_auth = ValidarAutorizacion(context);
+    if (!estado_auth.ok()) {
+        return estado_auth;
+    }
+
+    if (!manager_.ObtenerSubasta(request->id(), *response)) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "Subasta no encontrada");
+    }
+
+    return grpc::Status::OK;
+}
+
+grpc::Status SubastasServiceImpl::Seguir(grpc::ServerContext* context, const subastas::v1::SubastaId* request, grpc::ServerWriter<subastas::v1::Subasta>* writer) {
+    auto estado_auth = ValidarAutorizacion(context);
+    if (!estado_auth.ok()) {
+        return estado_auth;
+    }
+
+    subastas::v1::Subasta estado_inicial;
+    if (!manager_.ObtenerSubasta(request->id(), estado_inicial)) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "Subasta no encontrada");
+    }
+
+    // Envio el primer estado al conectarse
+    writer->Write(estado_inicial);
+
+    auto cola = manager_.Suscribir(request->id());
+
+    // Mantengo el flujo de datos activo
+    while (!context->IsCancelled()) {
+        subastas::v1::Subasta actualizacion;
+        if (cola->EsperarSiguiente(actualizacion, 500)) {
+            if (!writer->Write(actualizacion)) {
+                break;
+            }
+        }
+    }
+
+    manager_.Desuscribir(request->id(), cola);
+    return grpc::Status::OK;
+}
