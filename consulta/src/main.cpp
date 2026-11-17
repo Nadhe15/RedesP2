@@ -52,8 +52,10 @@ int main() {
     const char* grpcEnv = std::getenv("SUBASTAS_GRPC_URL");
     const char* restEnv = std::getenv("USUARIOS_REST_URL");
     const char* caEnv = std::getenv("SUBASTAS_CA_PATH");
+    const char* usuariosCaEnv = std::getenv("USUARIOS_CA_PATH");
     const char* portEnv = std::getenv("PORT");
-
+    
+    std::string caEnv usuariosCaPath = usuariosCaEnv ? usuariosCaEnv : "";
     std::string mode = secEnv ? secEnv : "vulnerable";
     std::string grpcUrl = grpcEnv ? grpcEnv : "subastas:50051";
     std::string restUrl = restEnv ? restEnv : "http://usuarios:8080";
