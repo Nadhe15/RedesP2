@@ -26,8 +26,13 @@ services:
     container_name: servicio_usuarios
     environment:
       PUERTO: "8080"
+      USAR_TLS: "true"
+      TLS_CERT_PATH: /run/tls/usuarios.crt
+      TLS_KEY_PATH: /run/tls/usuarios.key
       MODO_VULNERABLE: ${MODO_VULNERABLE:-false}
       SUBASTAS_HOST: subastas:50051
+    volumes:
+      - ./usuarios/certs:/run/tls:ro
     networks:
       - red_backend
     ports:
@@ -44,8 +49,9 @@ services:
       SUBASTAS_GRPC_URL: subastas:50051
       USUARIOS_REST_URL: http://usuarios:8080
       SUBASTAS_CA_PATH: /run/tls/server.crt
+      USUARIOS_CA_PATH: /run/tls/usuarios.crt
     volumes:
-      - ./subastas/certs/server.crt:/run/tls/server.crt:ro
+      - ./usuarios/certs/usuarios.crt:/run/tls/usuarios.crt:ro
     ports:
       - "4000:4000"
     depends_on:
