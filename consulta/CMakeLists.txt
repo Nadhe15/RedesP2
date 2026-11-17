@@ -62,3 +62,15 @@ target_link_libraries(consulta PRIVATE
     CURL::libcurl
     Threads::Threads
 )
+
+
+#cliente rest 
+add_executable(consulta
+    src/main.cpp 
+    src/graphql.cpp
+    src/grpc_client.cpp
+    src/rest_client.cpp
+    src/security.cpp
+    generated/subastas.pb.cc
+    generated/subastas.grpc.pb.cc
+)

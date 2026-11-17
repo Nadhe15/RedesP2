@@ -23,7 +23,10 @@ using subastas::v1::PujarResp;
 
 class SubastasGrpcClient {
 public:
-    explicit SubastasGrpcClient(const std::string& target);
+    explicit SubastasGrpcClient(
+        const std::string& target, 
+        const std:string& caPath
+);
 
     ~SubastasGrpcClient();
 
