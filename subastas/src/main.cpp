@@ -1,10 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <utility>
 #include <csignal>
 #include <atomic>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include "auth_token.hpp"
 #include "subastas_service.hpp"
 
 namespace {
@@ -40,8 +42,21 @@ int main() {
     std::string puerto = env_puerto ? env_puerto : "50051";
 
     const char* env_modo = std::getenv("SECURITY_MODE");
-    std::string modo = env_modo ? env_modo : "vulnerable";
+    std::string modo = env_modo ? env_modo : "blindado";
+    if (modo != "blindado" && modo != "hardened" && modo != "vulnerable") {
+        std::cerr << "SECURITY_MODE invalido: " << modo << std::endl;
+        return 1;
+    }
     bool modo_blindado = (modo == "hardened" || modo == "blindado");
+
+    const char* env_token_secret = std::getenv("AUTH_TOKEN_SECRET");
+    std::string auth_token_secret =
+        env_token_secret ? env_token_secret : "";
+    if (modo_blindado && !auth_token::secret_is_valid(auth_token_secret)) {
+        std::cerr << "AUTH_TOKEN_SECRET debe tener al menos 32 caracteres"
+                  << std::endl;
+        return 1;
+    }
 
     const char* env_cert = std::getenv("TLS_CERT_PATH");
     std::string ruta_cert = env_cert ? env_cert : "certs/server.crt";
@@ -52,7 +67,8 @@ int main() {
     std::string direccion_servidor = "0.0.0.0:" + puerto;
 
     SubastaManager manager;
-    SubastasServiceImpl servicio(manager, modo_blindado);
+    SubastasServiceImpl servicio(manager, modo_blindado,
+                                 std::move(auth_token_secret));
 
     grpc::ServerBuilder builder;
 

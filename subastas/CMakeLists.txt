@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Busco las librerias necesarias
 find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # Genero los archivos de protobuf y grpc
 set(PROTO_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../proto/subastas.proto)
@@ -43,10 +44,15 @@ add_executable(servidor_subastas
     ${GRPC_SRCS}
 )
 
+target_include_directories(servidor_subastas PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../common"
+)
+
 # Enlazo las dependencias del proyecto
 target_link_libraries(servidor_subastas
     gRPC::grpc++
     gRPC::grpc++_reflection
     protobuf::libprotobuf
+    OpenSSL::Crypto
     pthread
 )

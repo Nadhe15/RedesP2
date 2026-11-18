@@ -1,15 +1,22 @@
 #include "subastas_service.hpp"
+#include "auth_token.hpp"
 #include <iostream>
+#include <utility>
 
-SubastasServiceImpl::SubastasServiceImpl(SubastaManager& manager, bool modo_blindado)
-    : manager_(manager), modo_blindado_(modo_blindado) {}
+SubastasServiceImpl::SubastasServiceImpl(SubastaManager& manager,
+                                         bool modo_blindado,
+                                         std::string auth_token_secret)
+    : manager_(manager),
+      modo_blindado_(modo_blindado),
+      auth_token_secret_(std::move(auth_token_secret)) {}
 
-grpc::Status SubastasServiceImpl::ValidarAutorizacion(grpc::ServerContext* context) {
+grpc::Status SubastasServiceImpl::ValidarAutorizacion(
+    grpc::ServerContext* context,
+    std::string* usuario_id) {
     if (!modo_blindado_) {
         return grpc::Status::OK;
     }
 
-    // Compruebo los metadatos de autorizacion
     const auto& metadatos = context->client_metadata();
     auto it = metadatos.find("authorization");
     if (it == metadatos.end()) {
@@ -21,13 +28,29 @@ grpc::Status SubastasServiceImpl::ValidarAutorizacion(grpc::ServerContext* conte
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Token de autorizacion invalido");
     }
 
+    std::string subject;
+    std::time_t expires_at = 0;
+    if (!auth_token::verify(token.substr(7), auth_token_secret_,
+                            subject, expires_at)) {
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED,
+                            "Token invalido, manipulado o expirado");
+    }
+
+    if (usuario_id) {
+        *usuario_id = std::move(subject);
+    }
     return grpc::Status::OK;
 }
 
 grpc::Status SubastasServiceImpl::Crear(grpc::ServerContext* context, const subastas::v1::Subasta* request, subastas::v1::Subasta* response) {
-    auto estado_auth = ValidarAutorizacion(context);
+    std::string usuario_id;
+    auto estado_auth = ValidarAutorizacion(context, &usuario_id);
     if (!estado_auth.ok()) {
         return estado_auth;
+    }
+    if (modo_blindado_ && request->vendedor_id() != usuario_id) {
+        return grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                            "No puedes crear una subasta en nombre de otro usuario");
     }
 
     std::string error;
@@ -39,9 +62,14 @@ grpc::Status SubastasServiceImpl::Crear(grpc::ServerContext* context, const suba
 }
 
 grpc::Status SubastasServiceImpl::Pujar(grpc::ServerContext* context, const subastas::v1::PujarReq* request, subastas::v1::PujarResp* response) {
-    auto estado_auth = ValidarAutorizacion(context);
+    std::string usuario_id;
+    auto estado_auth = ValidarAutorizacion(context, &usuario_id);
     if (!estado_auth.ok()) {
         return estado_auth;
+    }
+    if (modo_blindado_ && request->usuario_id() != usuario_id) {
+        return grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                            "No puedes pujar en nombre de otro usuario");
     }
 
     manager_.ProcesarPuja(request->subasta_id(), request->usuario_id(), request->monto(), *response);

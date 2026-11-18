@@ -10,9 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY usuarios/Makefile ./Makefile
-COPY usuarios/src/ ./src/
+COPY usuarios/Makefile ./usuarios/Makefile
+COPY usuarios/src/ ./usuarios/src/
+COPY common/ ./common/
 
+WORKDIR /app/usuarios
 RUN make
 
 FROM debian:trixie-slim
@@ -27,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /app/bin/usuarios /app/usuarios
+COPY --from=builder /app/usuarios/bin/usuarios /app/usuarios
 
 # genero certificados autofirmados por defecto si el compose no monta unos propios
 # RUN mkdir -p /usuarios/certs && \

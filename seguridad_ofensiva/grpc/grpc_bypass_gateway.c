@@ -41,7 +41,10 @@ int main(int argc, char **argv) {
     long long monto = atoll(argv[5]);
     const char *token = (argc > 6 && argv[6][0]) ? argv[6] : NULL;
 
-    grpc_wire_ctx_t *ctx = grpc_wire_connect(host, puerto);
+    const char *ca_path = getenv("GRPC_CA_PATH");
+    grpc_wire_ctx_t *ctx = ca_path && ca_path[0]
+        ? grpc_wire_connect_tls(host, puerto, ca_path)
+        : grpc_wire_connect(host, puerto);
     if (!ctx) { fprintf(stderr, "no se pudo conectar a %s:%d\n", host, puerto); return 1; }
 
     /* PujarReq serializado a mano */
@@ -60,8 +63,9 @@ int main(int argc, char **argv) {
     }
 
     unsigned char *resp = NULL; size_t resp_len = 0; long grpc_status = -1;
-    grpc_wire_unary(ctx, "/subastas.v1.Subastas/Pujar", auth_a_usar,
-                     req, req_len, &resp, &resp_len, &grpc_status);
+    int llamada_ok = grpc_wire_unary(ctx, "/subastas.v1.Subastas/Pujar",
+                                     auth_a_usar, req, req_len,
+                                     &resp, &resp_len, &grpc_status);
 
     char objetivo[300];
     snprintf(objetivo, sizeof(objetivo), "%s:%d/subastas.v1.Subastas/Pujar", host, puerto);
@@ -72,11 +76,19 @@ int main(int argc, char **argv) {
 
     const char *resultado;
     char detalle[160];
-    if (grpc_status != 0) {
+    if (llamada_ok != 0) {
+        resultado = "error-transporte";
+        snprintf(detalle, sizeof(detalle),
+                 "fallo de transporte TLS/HTTP2; no se recibio respuesta gRPC");
+    } else if (grpc_status < 0) {
+        resultado = "respuesta-grpc-invalida";
+        snprintf(detalle, sizeof(detalle),
+                 "la llamada termino sin recibir grpc-status");
+    } else if (grpc_status != 0) {
         resultado = "bloqueado";
         snprintf(detalle, sizeof(detalle),
-                 "grpc-status=%ld (token=%s) -> rechazado, esperado en modo blindado",
-                 grpc_status, token ? token : "(ninguno)");
+                 "grpc-status=%ld -> rechazado, esperado en modo blindado",
+                 grpc_status);
     } else if (aceptada) {
         resultado = "VULNERABLE";
         snprintf(detalle, sizeof(detalle),

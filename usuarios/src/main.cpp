@@ -12,6 +12,7 @@
 
 #include "auth.hpp"
 #include "pagos.hpp"
+#include "auth_token.hpp"
 
 using json = nlohmann::json;
 
@@ -420,6 +421,15 @@ static void registrar_rutas(httplib::Server& svr, AuthStore& auth, PagosStore& p
 
 int main() {
     Config cfg = leer_config();
+    if (!cfg.modo_vulnerable) {
+        const char* secret = std::getenv("AUTH_TOKEN_SECRET");
+        if (!secret || !auth_token::secret_is_valid(secret)) {
+            std::cerr << "[usuarios] AUTH_TOKEN_SECRET debe tener al menos 32 caracteres"
+                      << std::endl;
+            return 1;
+        }
+    }
+
     AuthStore auth;
     PagosStore pagos;
 

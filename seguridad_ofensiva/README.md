@@ -9,7 +9,7 @@ equipos o servicios de terceros.
 ## Dependencias
 
 ```
-sudo apt install build-essential libcurl4-openssl-dev libnghttp2-dev
+sudo apt install build-essential libcurl4-openssl-dev libnghttp2-dev libssl-dev
 ```
 
 - Ataques REST y GraphQL: `libcurl` (HTTP/1.1 normal, sencillo).
@@ -79,9 +79,18 @@ páginas, sección 8).
   ajusta el nombre de campo/argumentos al esquema real que defina el Rol 3.
 - `grpc_wire.c` implementa un cliente gRPC mínimo (HTTP/2 en texto plano +
   framing gRPC + Protobuf a mano) pensado para este proyecto específico
-  (llamadas unarias simples). No soporta streaming completo ni TLS a
-  propósito: el objetivo es la demostración de ataque, no un cliente gRPC
-  de producción.
+  (llamadas unarias simples). Sin `GRPC_CA_PATH` usa h2c para el modo
+  vulnerable; al definir `GRPC_CA_PATH` valida el certificado TLS y negocia
+  HTTP/2. Usa como host un nombre/IP incluido en el certificado del servidor;
+  para separar la dirección TCP del nombre del certificado puedes definir
+  `GRPC_TLS_SERVER_NAME` (por ejemplo, `subastas`).
+  No es un cliente gRPC de producción.
+
+Para levantar los servicios en modo blindado, define `AUTH_TOKEN_SECRET` con
+al menos 32 bytes aleatorios en un archivo local ignorado por Git, por ejemplo
+`.env.local`; Compose lo requiere tanto para emitir como para verificar tokens.
+Para probar desde el host contra el certificado actual (CN `subastas`):
+`GRPC_CA_PATH=subastas/certs/server.crt GRPC_TLS_SERVER_NAME=subastas`.
 - Antes de la entrega, declara en el informe que parte de este código fue
   generado con asistencia de IA (sección 12, integridad académica), y
   asegúrate de poder explicar cada línea en la defensa individual.

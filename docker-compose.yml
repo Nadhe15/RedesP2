@@ -9,6 +9,7 @@ services:
     environment:
       PORT: "50051"
       SECURITY_MODE: ${SECURITY_MODE:-blindado}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?Define AUTH_TOKEN_SECRET en .env}
       TLS_CERT_PATH: /run/tls/server.crt
       TLS_KEY_PATH: /run/tls/server.key
     volumes:
@@ -29,6 +30,7 @@ services:
       TLS_CERT_PATH: /run/tls/usuarios.crt
       TLS_KEY_PATH: /run/tls/usuarios.key
       SECURITY_MODE: ${SECURITY_MODE:-blindado}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?Define AUTH_TOKEN_SECRET en .env}
       SUBASTAS_HOST: subastas:50051
     volumes:
       - ./usuarios/certs:/run/tls:ro

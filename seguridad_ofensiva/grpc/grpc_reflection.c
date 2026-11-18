@@ -86,7 +86,10 @@ int main(int argc, char **argv) {
     const char *host = argv[1];
     int puerto = atoi(argv[2]);
 
-    grpc_wire_ctx_t *ctx = grpc_wire_connect(host, puerto);
+    const char *ca_path = getenv("GRPC_CA_PATH");
+    grpc_wire_ctx_t *ctx = ca_path && ca_path[0]
+        ? grpc_wire_connect_tls(host, puerto, ca_path)
+        : grpc_wire_connect(host, puerto);
     if (!ctx) { fprintf(stderr, "no se pudo conectar a %s:%d\n", host, puerto); return 1; }
 
     /* ServerReflectionRequest { list_services: "" }  (host se deja vacio) */
@@ -94,22 +97,29 @@ int main(int argc, char **argv) {
     size_t req_len = pb_encode_string(req, 7, "");
 
     unsigned char *resp = NULL; size_t resp_len = 0; long grpc_status = -1;
-    grpc_wire_unary(ctx, "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
-                     NULL, req, req_len, &resp, &resp_len, &grpc_status);
+    int llamada_ok = grpc_wire_unary(
+        ctx, "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+        NULL, req, req_len, &resp, &resp_len, &grpc_status);
 
     char objetivo[300];
     snprintf(objetivo, sizeof(objetivo), "%s:%d", host, puerto);
 
-    if (grpc_status == 0 && resp_len > 0) {
+    if (llamada_ok != 0) {
+        log_result("gRPC-Reflection/API9", objetivo, 0, "error-transporte",
+                   "fallo TLS/HTTP2; no se puede concluir si reflection esta habilitada");
+    } else if (grpc_status == 0 && resp_len > 0) {
         printf("Servicios expuestos via reflection en %s:\n", objetivo);
         int encontrado = 0;
         recorrer_mensaje(resp, resp_len, buscar_list_services, &encontrado);
         log_result("gRPC-Reflection/API9", objetivo, 200,
                     encontrado ? "VULNERABLE" : "respuesta-sin-servicios",
                     "reflection respondio grpc-status=0");
-    } else {
+    } else if (grpc_status > 0) {
         log_result("gRPC-Reflection/API9", objetivo, 200, "bloqueado",
-                    "reflection no disponible (grpc-status != 0 o sin datos, esperado en modo blindado)");
+                    "reflection respondio con grpc-status distinto de cero");
+    } else {
+        log_result("gRPC-Reflection/API9", objetivo, 0, "respuesta-grpc-invalida",
+                    "la llamada termino sin recibir grpc-status");
     }
 
     free(resp);

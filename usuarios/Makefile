@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Isrc -DCPPHTTPLIB_OPENSSL_SUPPORT
+CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Isrc -I../common -DCPPHTTPLIB_OPENSSL_SUPPORT
 LDFLAGS := -lcpp-httplib -lssl -lcrypto -lpthread
 
 TARGET := bin/usuarios
@@ -7,7 +7,7 @@ SRCS := src/main.cpp src/auth.cpp src/pagos.cpp
 
 all: $(TARGET)
 
-$(TARGET): $(SRCS)
+$(TARGET): $(SRCS) ../common/auth_token.hpp
 	@mkdir -p bin
 	$(CXX) $(CXXFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
 

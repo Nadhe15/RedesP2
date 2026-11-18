@@ -4,20 +4,22 @@
 #include <stddef.h>
 
 /*
- * Cliente gRPC minimalista en C puro sobre HTTP/2 en texto plano
- * ("h2c", sin TLS) usando libnghttp2 para el framing HTTP/2 y framing
+ * Cliente gRPC minimalista en C puro sobre HTTP/2 usando libnghttp2
+ * para el framing HTTP/2 y framing
  * manual de gRPC (1 byte compresion + 4 bytes longitud BE + protobuf).
  *
- * Deliberadamente NO implementa TLS: eso es justamente lo que permite
- * capturar y decodificar el trafico con Wireshark (seccion 5.3, fila
- * "sin TLS" del enunciado). Sirve de base para grpc_reflection.c y
- * grpc_bypass_gateway.c.
+ * grpc_wire_connect usa h2c; grpc_wire_connect_tls valida el certificado
+ * indicado y negocia HTTP/2 mediante ALPN.
  */
 
 typedef struct grpc_wire_ctx grpc_wire_ctx_t;
 
-/* Conecta (TCP plano) a host:puerto y hace el handshake HTTP/2 (preface). */
+/* Conecta por TCP plano (h2c), para pruebas en modo vulnerable. */
 grpc_wire_ctx_t *grpc_wire_connect(const char *host, int puerto);
+
+/* Conecta con TLS, valida el certificado contra ca_file y exige ALPN h2. */
+grpc_wire_ctx_t *grpc_wire_connect_tls(const char *host, int puerto,
+                                       const char *ca_file);
 
 /*
  * Llamada unaria: abre un stream HTTP/2 nuevo hacia `path`

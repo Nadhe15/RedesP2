@@ -1,5 +1,7 @@
 #include "auth.hpp"
+#include "auth_token.hpp"
 
+#include <cstdlib>
 #include <iomanip>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -100,8 +102,17 @@ bool AuthStore::login(const std::string& correo,
         ses.token = "tok-" + u.id + "-" + std::to_string(contador_tokens_++);
         ses.expira_en = 0;
     } else {
-        ses.token = generar_aleatorio_hex(32);
         ses.expira_en = std::time(nullptr) + 3600;
+        const char* secret = std::getenv("AUTH_TOKEN_SECRET");
+        if (!secret || !auth_token::secret_is_valid(secret)) {
+            out_error = "AUTH_TOKEN_SECRET no esta configurado o es demasiado corto";
+            return false;
+        }
+        ses.token = auth_token::issue(u.id, ses.expira_en, secret);
+        if (ses.token.empty()) {
+            out_error = "no se pudo generar el token firmado";
+            return false;
+        }
     }
 
     sesiones_[ses.token] = ses;

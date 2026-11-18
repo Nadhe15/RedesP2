@@ -7,3 +7,4 @@ bin/
 .vscode/
 usuarios/certs/*.key
 .env
+.env.local

@@ -4,7 +4,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -std=c11 -D_POSIX_C_SOURCE=200809L -Icomun
 LDLIBS_CURL = -lcurl
-LDLIBS_GRPC = -lnghttp2
+LDLIBS_GRPC = -lnghttp2 -lssl -lcrypto
 
 COMUN = comun/common.c
 
@@ -14,6 +14,9 @@ GRPC_BIN = grpc_reflection grpc_bypass_gateway grpc_proto_decode
 TODOS = $(REST_BIN) $(GQL_BIN) $(GRPC_BIN)
 
 all: $(TODOS)
+rest: $(REST_BIN)
+graphql: $(GQL_BIN)
+grpc: $(GRPC_BIN)
 
 rest_bola: rest/rest_bola.c $(COMUN)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_CURL)
@@ -40,3 +43,5 @@ grpc_proto_decode: grpc/grpc_proto_decode.c $(COMUN)
 
 clean:
 	rm -f $(TODOS) results.csv
+
+.PHONY: all rest graphql grpc clean

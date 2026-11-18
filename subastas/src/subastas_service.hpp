@@ -2,11 +2,14 @@
 
 #include "subastas.grpc.pb.h"
 #include "subasta_manager.hpp"
+#include <string>
 
 // Implemento el servicio gRPC de subastas
 class SubastasServiceImpl final : public subastas::v1::Subastas::Service {
 public:
-    SubastasServiceImpl(SubastaManager& manager, bool modo_blindado);
+    SubastasServiceImpl(SubastaManager& manager,
+                        bool modo_blindado,
+                        std::string auth_token_secret);
 
     // Recibo la peticion para crear una subasta
     grpc::Status Crear(grpc::ServerContext* context, const subastas::v1::Subasta* request, subastas::v1::Subasta* response) override;
@@ -22,8 +25,10 @@ public:
 
 private:
     // Compruebo los permisos del cliente
-    grpc::Status ValidarAutorizacion(grpc::ServerContext* context);
+    grpc::Status ValidarAutorizacion(grpc::ServerContext* context,
+                                     std::string* usuario_id = nullptr);
 
     SubastaManager& manager_;
     bool modo_blindado_{false};
+    std::string auth_token_secret_;
 };
