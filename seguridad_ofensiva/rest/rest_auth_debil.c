@@ -24,6 +24,10 @@
 
 static long hacer_get(const char *url, const char *token, buffer_t *buf) {
     CURL *curl = curl_easy_init();
+if (curl) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+}
     struct curl_slist *headers = NULL;
     char authhdr[512];
     if (token) {

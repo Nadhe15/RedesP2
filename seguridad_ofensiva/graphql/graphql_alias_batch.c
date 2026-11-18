@@ -81,6 +81,10 @@ int main(int argc, char **argv) {
         p += sprintf(p, "}\"}");
 
         CURL *curl = curl_easy_init();
+if (curl) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+}
         buffer_t buf; buffer_init(&buf);
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");

