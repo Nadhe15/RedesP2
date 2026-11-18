@@ -58,6 +58,10 @@ int main(int argc, char **argv) {
     int exitosas = 0;
     for (int i = 1; i <= repeticiones; i++) {
         CURL *curl = curl_easy_init();
+if (curl) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+}
         buffer_t buf; buffer_init(&buf);
 
         struct curl_slist *headers = NULL;

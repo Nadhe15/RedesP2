@@ -86,6 +86,10 @@ int main(int argc, char **argv) {
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
     CURL *curl = curl_easy_init();
+if (curl) {
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+}
     if (!curl) { fprintf(stderr, "no se pudo iniciar curl\n"); return 1; }
 
     int expuestos = 0;
