@@ -10,3 +10,94 @@ Cambiando esntre esos modos podemos proteger o blindar el sistema, una vez las c
 docker compose up -d --build --force-recreate
 
 Asi el nuevo contenedor toma en cuenta las nuevas variuables de entorno ">u<>"
+
+---
+
+## Cómo está conectada la plataforma (topología)
+
+Todos los servicios corren dentro de la red interna aislada `red_backend` en Docker Compose y se comunican por nombre (`subastas`, `usuarios`, `consulta`):
+
+```text
+Cliente / Toolkit (C)
+   ├── GraphQL (HTTP, puerto 4000) ───────────► consulta (C++, :4000)
+   │                                               ├── gRPC / HTTP2 (+TLS en blindado) ──► subastas (C++, :50051)
+   │                                               └── HTTPS (:8080) ────────────────────► usuarios (C++, :8080)
+   └── REST / JSON (HTTP/HTTPS, puerto 8080) ─► usuarios (C++, :8080)
+                                                   └── gRPC / HTTP2 (+TLS en blindado) ──► subastas (C++, :50051)
+```
+
+* `subastas` (gRPC en `:50051`): maneja las subastas en memoria, concurrencia y el stream en vivo (`Seguir`).
+* `usuarios` (REST en `:8080`): registro, login, tokens y pagos simulados con idempotencia.
+* `consulta` (GraphQL en `:4000`): gateway para consultas y suscripciones.
+* `proto/subastas.proto`: contrato compartido por los servicios.
+
+## Antes de levantar
+
+Asegúrate de tener un archivo `.env` (puedes copiar `.env.example`) con `AUTH_TOKEN_SECRET` de al menos 32 caracteres y el `SECURITY_MODE` que quieras usar (`vulnerable` o `blindado`).
+
+## Crear datos de prueba y probar cada interfaz
+
+### REST (Usuarios y Pagos - puerto 8080)
+En modo blindado se usa `https://` (con `-k` por el certificado autofirmado); en modo vulnerable se usa `http://`.
+
+```bash
+# Ver que el servicio responde
+curl -k https://localhost:8080/health
+
+# Registrar un usuario de prueba
+curl -k -X POST https://localhost:8080/api/v1/registro \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Ana","correo":"ana@test.com","clave":"Password123!"}'
+
+# Hacer login para sacar el token
+curl -k -X POST https://localhost:8080/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"correo":"ana@test.com","clave":"Password123!"}'
+
+# Consultar perfil con el token que devolvió el login
+curl -k https://localhost:8080/api/v1/perfil \
+  -H "Authorization: Bearer <TU_TOKEN>"
+
+# Probar un cobro con clave de idempotencia
+curl -k -X POST https://localhost:8080/api/v1/pagos/cobrar \
+  -H "Authorization: Bearer <TU_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: pago-001" \
+  -d '{"subasta_id":"subasta-1","monto":5000}'
+```
+
+### GraphQL (Consulta - puerto 4000)
+
+```bash
+# Probar introspección (abierta en vulnerable, bloqueada en blindado)
+curl -s -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ __schema { types { name } } }"}'
+
+# Probar bomba de profundidad (depth bomb)
+./seguridad_ofensiva/graphql_depth_bomb http://localhost:4000/graphql subasta subasta 15
+```
+
+### gRPC (Subastas - puerto 50051)
+
+```bash
+# Llamada directa sin TLS (en blindado la rechaza por transporte)
+./seguridad_ofensiva/grpc_bypass_gateway 127.0.0.1 50051 subasta-demo atacante 100000
+
+# Llamada con TLS pero sin token válido (en blindado responde grpc-status=2)
+GRPC_CA_PATH=subastas/certs/server.crt GRPC_TLS_SERVER_NAME=subastas \
+  ./seguridad_ofensiva/grpc_bypass_gateway 127.0.0.1 50051 subasta-demo atacante 100000
+```
+
+## Correr el toolkit de ataques
+
+Los ataques están escritos en C dentro de `seguridad_ofensiva/`. Para correrlos todos contra el modo que tengas levantado:
+
+```bash
+cd seguridad_ofensiva
+make
+./run_all.sh vulnerable   # cuando el sistema está en SECURITY_MODE=vulnerable
+./run_all.sh blindado     # cuando el sistema está en SECURITY_MODE=blindado
+```
+
+Los resultados quedan guardados en `results.csv`, las capturas de Wireshark en `vulnerable.pcapng` (gRPC sin TLS) y `blindado.pcapng` (gRPC con TLS), y el detalle completo en `InformeP2.pdf`.
